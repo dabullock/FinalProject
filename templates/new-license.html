@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %} New Recipe {% endblock %}
+
+
+{% block body %} 
+
+<h3>Create New License Key</h3>
+  <hr>
+  {% if newKey %}
+  <form method="POST" id="newForm" action="{{ url_for('add_license') }}">
+        <p> <label  for="licenseKey"> License: </label>    
+            <input type="text" id="licenseKey" name="licenseKey" required autofocus readonly value="{{newKey}}"></p>
+        <p> <label  for="email"> Email: </label>    
+        <input type="text" id="email" name="email" required autofocus></p>
+        <p> <label  for="recipe_name"> First Name: </label>    
+        <input type="text" id="first_name" name="first_name" required autofocus></p>
+        <p> <label  for="recipe_name"> Last Name: </label>    
+        <input type="text" id="last_name" name="last_name" required autofocus></p>
+        <p> <label  for="discord"> Discord Username: </label>    
+        <input type="text" id="discord" name="discord" required autofocus></p>
+        <label for="length">Subscription length:</label>
+        <select name="length" readonly>
+          <option value="3">3 Months</option>  
+          <option value="6">6 Months</option>
+          <option value="year">1 Year</option>     
+        </select>
+        </p>
+        <label for="price">Renewal Price:</label>
+        <select name="price" readonly>
+          <option value="100">$100</option>  
+          <option value="200">$200</option>
+          <option value="400">$400</option>     
+        </select>
+        </p>
+    <input type="submit" value="Save"></p>
+
+  </form>
+  
+{% endif %}
+
+{% endblock %}

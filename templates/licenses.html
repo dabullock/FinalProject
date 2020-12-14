@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %} License Administration {% endblock %}
+
+
+{% block body %} 
+
+<h1>License Management</h1>
+<hr>
+<div class="container">
+    <div class="row">
+        <h3 style="margin-right: 8px;">All Licenses</h3>
+    <form action="{{ url_for('new_license') }}" method="GET">
+        <input type="submit" value="Create License"  />
+    </form>  
+    </div>
+</div>
+  <hr>
+
+  <br>
+  {% if all_users %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">Email</th>
+                <th scope="col">License Key</th>
+                <th scope="col">Discord</th>
+                <th scope="col">Subscription</th>
+                <th scope="col">Renewal Price</th>
+                <th scope="col"></th>
+                <th scope="col"></th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for row in all_users %}
+            <tr>
+                
+                <td> {{ row['email'] }}</td>
+                <td> {{ row['licenseKey'] }}</td>
+                <td>{{ row['discord']['username']}}</td>
+                <td> {{ row['renewal']['length'] }}</td>
+                <td> ${{ row['renewal']['price'] }}</td>
+            
+                <td><form action="{{ url_for('delete_license', license_id=row['_id']) }}" method="POST">
+                    <input type="submit" value="Delete"  />
+                </form>    </td>
+
+                <td><form action="{{ url_for('edit_license', license_id=row['_id']) }}" method="POST">
+                    <input type="submit" value="Details"  />
+                </form>    </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+
+{% endblock %}

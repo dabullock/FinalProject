@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %} My Recipes Administration {% endblock %}
+{% block title %} Users Administration {% endblock %}
 
 
 {% block body %} 
 
 <h1>Admin Page</h1>
 <hr>
-<p>My recipes admin page</p>
-<h3>Create your account</h3>
+<p>User Management</p>
+<h3>Create an account</h3>
   <hr>
   <form method="POST" action="/admin/add-user">
 
@@ -20,6 +20,9 @@
 
     <p> <label  for="email"> Email: </label>    
     <input type="text" id="email" name="email" required ></p>
+
+    <p> <label  for="licenseKey"> License Key: </label>    
+    <input type="text" id="licenseKey" name="licenseKey" required ></p>
 
     <p> <label  for="password"> Password: </label>    
     <input type="text" id="password" name="password" required ></p>
@@ -50,7 +53,7 @@
                 <th scope="col">Last Name</th>
                 <th scope="col">Email</th>
                 <th scope="col">Role</th>
-                <th scope="col">Date Added</th>
+                <th scope="col">License Key</th>
                 <th scope="col">Date Modified</th>
             </tr>
         </thead>
@@ -63,7 +66,7 @@
                 <td> {{ row['last_name'] }}</td>
                 <td> {{ row['email'] }}</td>
                 <td> {{ row['role'] }}</td>
-                <td> {{ row['date_added'] }}</td>
+                <td> {{ row['licenseKey'] }}</td>
                 <td> {{ row['date_modified'] }}</td>
             
                 <td><form action="{{ url_for('admin_delete_user', user_id=row['_id']) }}" method="POST">

@@ -7,6 +7,7 @@ from flask import Flask, request, render_template, redirect, url_for, session, f
 from flask_login import LoginManager, UserMixin, current_user, login_user, logout_user, login_required
 import bcrypt
 from functools import wraps
+import uuid
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
@@ -16,15 +17,16 @@ APP_ROOT = os.path.join(os.path.dirname(__file__), '..')   # refers to applicati
 dotenv_path = os.path.join(APP_ROOT, '.env')
 load_dotenv(dotenv_path)
 
-mongo = 'mongodb+srv://daniel:Z47c6cI1SfOvWElZ@schoolserver.coq5b.mongodb.net/schoolServer?retryWrites=true&w=majority'#os.getenv('MONGO')
+mongo = 'mongodb+srv://daniel:Z47c6cI1SfOvWElZ@schoolserver.coq5b.mongodb.net/myProject?retryWrites=true&w=majority'#os.getenv('MONGO')
 print(mongo)
 client = pymongo.MongoClient(mongo)
 
-db = client['schoolServer'] # Mongo collection
+db = client['myProject'] # Mongo collection
 users = db['users'] # Mongo document
 roles = db['roles'] # Mongo document
 categories = db['categories'] # Mongo document
 recipes = db['recipes'] # Mongo document
+licenses = db['licenses']
 
 login = LoginManager()
 login.init_app(app)
@@ -169,7 +171,8 @@ def update_myaccount(user_id):
 @login_required
 @roles_required('admin')
 def admin_users():
-    return render_template('users.html', all_roles=roles.find(), all_users=users.find())
+    newKeyToMake = str(uuid.uuid4())
+    return render_template('users.html', all_roles=roles.find(), all_users=users.find(), newKey=newKeyToMake)
 
 
 @app.route('/admin/add-user', methods=['GET', 'POST'])
@@ -178,7 +181,10 @@ def admin_users():
 def admin_add_user():
     if request.method == 'POST':
         form = request.form
-        
+        license = licenses.find_one({'licneseKey': form['licenseKey']})
+        if not license:
+            flash("License key not found, please enter an existing key", "warning")
+            return redirect(url_for('admin_users'))
         password = request.form['password']
         
         email = users.find_one({"email": request.form['email']})
@@ -245,14 +251,7 @@ def admin_update_user(user_id):
         return redirect(url_for('admin_users'))
     return render_template('users.html', all_roles=roles.find(), all_users=users.find())
 
-##########  Recipes ##########
-
-# VIEW ALL RECIPES LIST
-@app.route('/recipes/all', methods=['GET', 'POST'])
-@login_required
-@roles_required('admin', 'contributor', 'user')
-def fetch_all_recipes():
-    return render_template('all-recipes.html', all_users=recipes.find())
+##########  Licenses ##########
 
 # VIEW INDIVIDUAL RECIPE DETAILS
 @app.route('/recipes/view-recipe/<recipe_id>', methods=['GET', 'POST'])
@@ -266,19 +265,21 @@ def view_recipe(recipe_id):
     return redirect(url_for('fetch_all_recipes'))
 
 # VIEW ALL RECIPES w/ admin features
-@app.route('/recipes/manage', methods=['GET', 'POST'])
+@app.route('/licenses/manage', methods=['GET', 'POST'])
 @login_required
 @roles_required('admin', 'contributor')
-def recipe_manager():
-    return render_template('recipes.html', all_roles=roles.find(), all_users=recipes.find())
+def license_manager():
+    print('hfdhjfjdjhdh')
+    return render_template('licenses.html', all_roles=roles.find(), all_users=licenses.find())
 
 # GIVE NEW RECIPE FORM
-@app.route('/recipes/new-recipe', methods=['GET', 'POST'])
+@app.route('/licenses/new-license', methods=['GET', 'POST'])
 @login_required
 @roles_required('admin', 'contributor')
-def new_recipe():
+def new_license():
     if request.method == 'GET':
-        return render_template('new-recipe.html', firstName=current_user.first_name, lastName=current_user.last_name, all_categories=categories.find())
+        keyToUse = str(uuid.uuid4())
+        return render_template('new-license.html', firstName=current_user.first_name, lastName=current_user.last_name, newKey=keyToUse)
     if request.method == 'POST':
         return 'This should add a recipe'
     #view_recipe = recipes.find_one({'_id': ObjectId(recipe_id)})
@@ -287,90 +288,117 @@ def new_recipe():
     #flash('Recipe not found.', 'warning')
     #return redirect(url_for('fetch_all_recipes'))
 
-@app.route('/recipes/add-recipe', methods=['POST'])
+@app.route('/licenses/add-license', methods=['POST'])
 @login_required
 @roles_required('admin', 'contributor')
-def add_recipe():
+def add_license():
     if request.method == 'POST':
         form = request.form
-        recipe_data = {
-            'recipe_name': form['recipe_name'],
-            'category': form['category'],
-            'ingredients': form['ingredients'],
-            'preparation': form['preparation'],
-            'notes': form['notes'],
-            'first_name': form['author_first'],
-            'last_name': form['author_last'],
-            'date_added': datetime.datetime.now(),
+        if form['length'] == '3':
+            date = datetime.date.today()
+            date+=datetime.timedelta(3 * 30)
+            time = '3 Months'
+        if form['length'] == '6':
+            date = datetime.date.today()
+            date+=datetime.timedelta(6 * 30)
+            time = '6 Months'
+        if form['length'] == 'year':
+            date = datetime.date.today()
+            date+=datetime.timedelta(365)
+            time = '1 Year'
+        licenseData = {
+            "first_name": form['first_name'],
+            "last_name": form['last_name'],
+            "licenseKey": form['licenseKey'],
+            "email": form['email'],
+            "machine": {
+                "active": False,
+                "machineId": None,
+                "networkId": None
+            },
+            "discord": {
+                "active": False,
+                "userId": None,   # discord ID is automatically gotten when they join our support chat
+                "username": form['discord']
+            },
+            "renewal": {
+                "isRenewal": True,
+                "valid": True,
+                "date": str(date),
+                "renewID": str(uuid.uuid4()),
+                "length": time,
+                "price": int(form['price']),
+                "canUnbind": True
+            },
             'date_modified': datetime.datetime.now()
         }
-        recipes.insert_one(recipe_data)
-        flash('Saved New Recipe: {}'.format(form['recipe_name']), 'success')
-        return redirect(url_for('recipe_manager'))
+        licenses.insert_one(licenseData)
+        flash('Saved New License: {}'.format(form['licenseKey']), 'success')
+        return redirect(url_for('license_manager'))
     else:
-        return render_template('new-recipe.html', firstName=current_user.first_name, lastName=current_user.last_name, all_categories=categories.find())
+        return render_template('new-license.html', firstName=current_user.first_name, lastName=current_user.last_name, all_categories=categories.find())
 
 
 # DELETE RECIPE
-@app.route('/recipes/delete-recipe/<recipe_id>', methods=['GET', 'POST'])
+@app.route('/licenses/delete-license/<license_id>', methods=['GET', 'POST'])
 @login_required
 @roles_required('admin', 'contributor')
-def delete_recipe(recipe_id):
-    delete_recipe = recipes.find_one({'_id': ObjectId(recipe_id)})
-    if delete_recipe:
-        recipes.delete_one(delete_recipe)
-        flash(delete_recipe['recipe_name'] + ' has been deleted.', 'warning')
-        return redirect(url_for('recipe_manager'))
-    flash('Recipe not found.', 'warning')
-    return redirect(url_for('recipe_manager'))
+def delete_license(license_id):
+    delete_license = licenses.find_one({'_id': ObjectId(license_id)})
+    if delete_license:
+        licenses.delete_one(delete_license)
+        flash(delete_license['licenseKey'] + ' has been deleted.', 'warning')
+        return redirect(url_for('license_manager'))
+    flash('License not found.', 'warning')
+    return redirect(url_for('license_manager'))
 
 # LOAD EDIT TEMPLATE
-@app.route('/recipes/edit-recipe/<recipe_id>', methods=['GET', 'POST'])
+@app.route('/licenses/edit-license/<license_id>', methods=['GET', 'POST'])
 @login_required
 @roles_required('admin', 'contributor')
-def edit_recipe(recipe_id):
-    edit_recipe = recipes.find_one({'_id': ObjectId(recipe_id)})
-    if edit_recipe:
-        return render_template('edit-recipe.html', recipe=edit_recipe, all_roles=roles.find(),all_categories=categories.find(), user_email=session['_user_id'])
-    flash('Recipe not found.', 'warning')
-    return redirect(url_for('recipe_manager'))
+def edit_license(license_id):
+    edit_licenes = licenses.find_one({'_id': ObjectId(license_id)})
+    if edit_licenes:
+        return render_template('edit-license.html', license=edit_licenes, all_roles=roles.find(), user_email=session['_user_id'])
+    flash('License not found.', 'warning')
+    return redirect(url_for('license_manager'))
 
 # UPDATE RECIPE
-@app.route('/recipes/update-recipe/<recipe_id>', methods=['GET', 'POST'])
+@app.route('/licenses/update-license/<license_id>', methods=['GET', 'POST'])
 @login_required
 @roles_required('admin', 'contributor')
-def update_recipe(recipe_id):
+def update_license(license_id):
     if request.method == 'POST':
         form = request.form
-        if current_user.first_name == form['author_first'] and current_user.last_name == form['author_last']:
-            try:
-                recipes.update({'_id': ObjectId(recipe_id)},
-                    {
-                    'recipe_name': form['recipe_name'],
-                    'category': form['category'],
-                    'ingredients': form['ingredients'],
-                    'preparation': form['preparation'],
-                    'notes': form['notes'],
-                    'first_name': form['author_first'],
-                    'last_name': form['author_last'],
-                    'date_added': form['date_added'],
-                    'date_modified': datetime.datetime.now()
-                    })
-                update_recipe = recipes.find_one({'_id': ObjectId(recipe_id)})
-            except Exception as e:
-                print(e)
-            flash('Updated Recipe', 'success')
-            return redirect(url_for('recipe_manager'))
-        else:
-            flash('Cannot update recipes you did not post', 'warning')
-            return redirect(url_for('edit_recipe', recipe_id=recipe_id))
+        try:
+            update_license = licenses.find_one({'_id': ObjectId(license_id)})
+
+            if form['active'] == 'false':
+                update_license['machine']['active'] = False
+                update_license['machine']['machineId'] = None
+                update_license['machine']['networkId'] = None
+
+            update_license['licenseKey'] = form['licenseKey']
+            update_license['email'] = form['email']
+            update_license['first_name'] = form['first_name']
+            update_license['last_name'] = form['last_name']
+            update_license['discord']['username'] = form['discord']
+
+            licenses.update({'_id': ObjectId(license_id)},
+                update_license)
+        except Exception as e:
+            print(e)
+            flash('Unknown Error Updating License', 'warning')
+            return redirect(url_for('license_manager'))
+        flash('Updated License', 'success')
+        return redirect(url_for('license_manager'))
     return render_template('recipes.html', all_roles=roles.find(), all_users=recipes.find())
 
 
-@app.route('/recipes/search', methods=['POST'])
+@app.route('/licenses/search', methods=['POST'])
 @login_required
 @roles_required('admin', 'contributor', 'user')
-def serch_recipe():
+def serch_license():
     if request.method == 'POST':
         form = request.form
         allRecipes = recipes.find()
@@ -384,7 +412,7 @@ def serch_recipe():
             if search_data.lower() in recipe['recipe_name'].lower():
                 results.append(recipe)
         if len(results) == 0:
-            flash('No recipes matching search', 'warning')
+            flash('No Licenses matching search', 'warning')
             return redirect(url_for('index'))
         return 'Search feature not yet implemented, found %s results'%(len(results))
     else:

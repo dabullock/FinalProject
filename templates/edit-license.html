@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %} License Edit {% endblock %}
+
+
+{% block body %} 
+
+<h3>Editing License for {{license['email']}}</h3>
+  <hr>
+  {% if license %}
+  <form method="POST" id="editForm" action="{{ url_for('update_license', license_id=license['_id']) }}">
+
+        <p> <label  for="first_name"> First Name: </label>    
+        <input type="text" id="first_name" name="first_name" required autofocus value="{{ license['first_name'] }}"></p>
+        <p> <label  for="last_name"> Last Name: </label>    
+        <input type="text" id="last_name" name="last_name" required autofocus value="{{ license['last_name'] }}"></p>
+        <p> <label  for="email"> Email: </label>    
+        <input type="text" id="email" name="email" required autofocus value="{{ license['email'] }}"></p>
+        <p> <label  for="licenseKey"> License: </label>    
+        <input type="text" id="licenseKey" name="licenseKey" required autofocus value="{{ license['licenseKey'] }}"></p>
+        <label for="role">Active :</label>
+        <select name="active" >
+          <option value="true"{% if license['machine']['active'] == true %} SELECTED {% endif %}>True</option> 
+          <option value="false"{% if license['machine']['active'] == false %} SELECTED {% endif %}>False</option>    
+        </select>
+        </p>
+
+        <p> <label  for="discord"> Discord User: </label>    
+        <input type="text" id="discord" name="discord" required autofocus value="{{ license['discord']['username'] }}"></p>
+        <p> <label  for="renewal"> Renewal Length: </label>    
+        <input type="text" id="renewal" name="renewal" required autofocus readonly value="{{ license['renewal']['length'] }}"></p>
+        <p> <label  for="renewalPrice"> Renewal Price: </label>    
+        <input type="text" id="renewalPrice" name="renewalPrice" required autofocus readonly value="${{ license['renewal']['price'] }}"></p>
+            <p> <label  for="date_modified"> Date Modifed: </label>    
+                <input type="text" id="date_modified" name="date_modified" required value="{{ license['date_modified'] }}" readonly></p>
+
+        <p>  
+    <input type="submit" value="Update License"></p>
+
+  </form>
+  
+{% endif %}
+
+{% endblock %}
