@@ -36,27 +36,27 @@ def add_category(category_name):
 
 def add_license():
     licenseData = {
-        "first_name": "John",
-        "last_name": "Doe",
-        "licenseKey": "798fa812-00be-64b0-a000-1896cf1daf8c",
-        "email": "john.doe@gmail.com",
+        "first_name": "James",
+        "last_name": "Smith",
+        "licenseKey": "4e509aa9-765b-302c-d312-2d9a893dc9f2",
+        "email": "j.smith342@gmail.com",
         "machine": {
             "active": True,
-            "machineId": "zf56f450-de68-56ae-9179-rta2fffk5602",
-            "networkId": "65.28.211.141"
+            "machineId": "05e86fd5-8ccc-80bc-00f8-50c8399a7abe",
+            "networkId": "54.110.211.141"
         },
         "discord": {
             "active": True,
             "userId": "513532372243709952",
-            "username": "JohnDoe#0002"
+            "username": "yzyszn#3409"
         },
         "renewal": {
             "isRenewal": True,
             "valid": True,
             "date": "2021-12-14",
-            "renewID": "r738h559-cee6-48b0-86a6-c57aca45df24",
-            "length": "1 Year",
-            "price": 400,
+            "renewID": "0eb0a6fb-0cda-47e7-248c-a0d00ffab880",
+            "length": "6 Months",
+            "price": 200,
             "canUnbind": True
         },
         'date_modified': datetime.datetime.now()
@@ -108,7 +108,7 @@ def initial_database():
 
     # add users
     #mike = add_user('Daniel', 'Bullock', 'd.bullock@dabullock.com', 'password100', 'admin')
-    #add_license()
+    add_license()
     #add_purchaser()
     # add categories
     #main = add_category('Main dishes')
