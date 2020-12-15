@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %} My License {% endblock %}
+
+
+{% block body %} 
+
+<h3>Your License</h3>
+  <hr>
+  <h4><label for="renewDate">Renewal Date - {{renewDate}}</label></h4>
+  <h5><label for="renewPrice">Renewal Price - ${{renewPrice}}</label></h5>
+  <hr>
+  <br>
+  <div class="container">
+      <div class="d-flex flex-row">
+        {% if attemptedCheckouts > 0 %}
+          <div class="p-2" style="margin-right:30%;">
+            <h6>Total Checkouts Attempted: {{attemptedCheckouts}}</h6>
+            <p><a href="/my-license/checkouts">View Successful Checkouts</a></p>
+          </div>
+        {% endif %}
+        {% if attemptedCheckouts == 0 %}
+          <div class="p-2" style="margin-right:30%;">
+            <h6>Total Checkouts Attempted: 0</h6>
+          </div>
+        {% endif %}
+        <div class="p-2">
+          <h6>Machine</h6>
+          {% if active == true %}
+            <form method="POST" id="newForm" action="{{ url_for('deactivate_license') }}">
+                  <label for="role">Active :</label>
+                  <select name="active" >
+                    <option value="true" SELECTED>True</option> 
+                    <option value="false">False</option>    
+                  </select>
+                  </p>
+              <input type="submit" value="Deactivate"></p>
+
+            </form>
+            
+          {% endif %}
+          {% if active != true %}
+          <label for="role">License is not currently linked to a machine</label>
+          {% endif %}
+        </div>
+      </div>
+  </div>
+
+{% endblock %}

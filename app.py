@@ -24,9 +24,8 @@ client = pymongo.MongoClient(mongo)
 db = client['myProject'] # Mongo collection
 users = db['users'] # Mongo document
 roles = db['roles'] # Mongo document
-categories = db['categories'] # Mongo document
-recipes = db['recipes'] # Mongo document
 licenses = db['licenses']
+purchases = db['purchases']
 
 login = LoginManager()
 login.init_app(app)
@@ -37,15 +36,16 @@ def load_user(username):
     u = users.find_one({"email": username})
     if not u:
         return None
-    return User(username=u['email'], role=u['role'], id=u['_id'], first_name=u['first_name'], last_name=u['last_name'])
+    return User(username=u['email'], role=u['role'], id=u['_id'], first_name=u['first_name'], last_name=u['last_name'], licenseKey=u['licenseKey'])
 
 class User:
-    def __init__(self, id, username, role, first_name, last_name):
+    def __init__(self, id, username, role, first_name, last_name, licenseKey):
         self._id = id
         self.username = username
         self.role = role
         self.first_name = first_name
         self.last_name = last_name
+        self.licenseKey = licenseKey
 
     @staticmethod
     def is_authenticated():
@@ -108,8 +108,8 @@ def login():
         print(request.form['username'])
         user = users.find_one({"email": request.form['username']})
         print(user)
-        if user and user['password'] == request.form['password']:
-            user_obj = User(username=user['email'], role=user['role'], id=user['_id'], first_name=user['first_name'], last_name=user['last_name'])
+        if user and bcrypt.checkpw(request.form['password'].encode(),user['password'].encode()):
+            user_obj = User(username=user['email'], role=user['role'], id=user['_id'], first_name=user['first_name'], last_name=user['last_name'], licenseKey=user['licenseKey'])
             login_user(user_obj)
             next_page = request.args.get('next')
 
@@ -132,7 +132,7 @@ def logout():
 
 @app.route('/my-account/<user_id>', methods=['GET', 'POST'])
 @login_required
-@roles_required('user', 'contributor', 'admin')
+@roles_required('user', 'admin')
 def my_account(user_id):
     edit_account = users.find_one({'_id': ObjectId(user_id)})
     if edit_account:
@@ -140,26 +140,32 @@ def my_account(user_id):
     flash('User not found.', 'warning')
     return redirect(url_for('index'))
 
+
 @app.route('/update-myaccount/<user_id>', methods=['GET', 'POST'])
 @login_required
-@roles_required('user', 'contributor', 'admin')
+@roles_required('user', 'admin')
 def update_myaccount(user_id):
     if request.method == 'POST':
         form = request.form
-
+        update_account = users.find_one({'_id': ObjectId(user_id)})
         password = request.form['password']
+        if password != form['confirm_password']:
+            flash('Passwords must match', 'warning')
+            return redirect(url_for('my_account', user_id=user_id))
+        if '$2b' not in password:
+            password = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
         users.update({'_id': ObjectId(user_id)},
             {
             'first_name': form['first_name'],
             'last_name': form['last_name'],
             'email': form['email'],
+            'licenseKey': form['licenseKey'],
             'password': password,
             'role': form['role'],
             'date_added': form['date_added'],
             'date_modified': datetime.datetime.now()
             })
-        update_account = users.find_one({'_id': ObjectId(user_id)})
         flash(update_account['email'] + ' has been modified.', 'success')
         return redirect(url_for('index'))
     return redirect(url_for('index'))
@@ -181,11 +187,15 @@ def admin_users():
 def admin_add_user():
     if request.method == 'POST':
         form = request.form
-        license = licenses.find_one({'licneseKey': form['licenseKey']})
-        if not license:
+        license = licenses.find_one({'licenseKey': form['licenseKey']})
+        if license == None:
             flash("License key not found, please enter an existing key", "warning")
             return redirect(url_for('admin_users'))
         password = request.form['password']
+        if password != form['confirm_password']:
+            flash('Passwords must match', 'warning')
+            return redirect(url_for('admin_users'))
+        password = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
         
         email = users.find_one({"email": request.form['email']})
         if email:
@@ -195,6 +205,7 @@ def admin_add_user():
             'first_name': form['first_name'],
             'last_name': form['last_name'],
             'email': form['email'],
+            'licenseKey': form['licenseKey'],
             'password': password,
             'role': form['role'],
             'date_added': datetime.datetime.now(),
@@ -235,12 +246,18 @@ def admin_update_user(user_id):
         form = request.form
 
         password = request.form['password']
+        if password != form['confirm_password']:
+            flash('Passwords must match', 'warning')
+            return redirect(url_for('admin_edit_user', user_id=user_id))
+        if '$2b' not in password:
+            password = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
         users.update({'_id': ObjectId(user_id)},
             {
             'first_name': form['first_name'],
             'last_name': form['last_name'],
             'email': form['email'],
+            'licenseKey': form['licenseKey'],
             'password': password,
             'role': form['role'],
             'date_added': form['date_added'],
@@ -252,45 +269,65 @@ def admin_update_user(user_id):
     return render_template('users.html', all_roles=roles.find(), all_users=users.find())
 
 ##########  Licenses ##########
-
-# VIEW INDIVIDUAL RECIPE DETAILS
-@app.route('/recipes/view-recipe/<recipe_id>', methods=['GET', 'POST'])
+### VIEW LICENSE IINFO AS A USER
+## You can deactivate your license key from current machine
+## as well as view all successful purchases
+@app.route('/my-license', methods=['GET', 'POST'])
 @login_required
-@roles_required('admin', 'contributor', 'user')
-def view_recipe(recipe_id):
-    view_recipe = recipes.find_one({'_id': ObjectId(recipe_id)})
-    if view_recipe:
-        return render_template('view-recipe.html', recipe=view_recipe, all_roles=roles.find(), all_categories=categories.find(), user_email=session['_user_id'])
-    flash('Recipe not found.', 'warning')
-    return redirect(url_for('fetch_all_recipes'))
+@roles_required('user', 'admin')
+def my_license():
+    this_license = licenses.find_one({'licenseKey': current_user.licenseKey})
+    if this_license:
+        renewDate = this_license['renewal']['date']
+        active = this_license['machine']['active']
+        renewPrice = str(this_license['renewal']['price'])
+        purchaseHistory = purchases.find_one({'licenseKey': current_user.licenseKey})
+        if purchaseHistory:
+            total = len(purchaseHistory['purchaseRecords'])
+        else: 
+            total = 0
+        return render_template('my-license.html', renewDate=renewDate, renewPrice=renewPrice, active=active, attemptedCheckouts=total)
+    flash('License not found.', 'warning')
+    return redirect(url_for('index'))
 
-# VIEW ALL RECIPES w/ admin features
+
+#Load and display all of a users successful purchases on their license
+@app.route('/my-license/checkouts', methods=['GET'])
+@login_required
+@roles_required('user', 'admin')
+def my_checkouts():
+    purchaseHistory = purchases.find_one({'licenseKey': current_user.licenseKey})
+    if purchaseHistory:
+        successfulPurchases = list()
+        totalSuccess = 0
+        for checkout in purchaseHistory['purchaseRecords']:
+            if checkout['status'] == 'Success':
+                successfulPurchases.append(checkout)
+                totalSuccess+=1
+        successfulPurchases.reverse()
+        return render_template('my-checkouts.html', totalSuccess=totalSuccess, checkouts=successfulPurchases)
+    flash('No Purchase Records for {}'.format(current_user.licenseKey), 'warning')
+    return redirect(url_for('my_license'))
+
+# VIEW ALL Licenses w/ admin features
 @app.route('/licenses/manage', methods=['GET', 'POST'])
 @login_required
-@roles_required('admin', 'contributor')
+@roles_required('admin')
 def license_manager():
-    print('hfdhjfjdjhdh')
     return render_template('licenses.html', all_roles=roles.find(), all_users=licenses.find())
 
-# GIVE NEW RECIPE FORM
+# Load new license form 
 @app.route('/licenses/new-license', methods=['GET', 'POST'])
 @login_required
-@roles_required('admin', 'contributor')
+@roles_required('admin')
 def new_license():
-    if request.method == 'GET':
-        keyToUse = str(uuid.uuid4())
-        return render_template('new-license.html', firstName=current_user.first_name, lastName=current_user.last_name, newKey=keyToUse)
-    if request.method == 'POST':
-        return 'This should add a recipe'
-    #view_recipe = recipes.find_one({'_id': ObjectId(recipe_id)})
-    #if view_recipe:
-       # return render_template('view-recipe.html', firstName=current_user.first_name, lastName=current_user.last_name, all_categories=categories.find())
-    #flash('Recipe not found.', 'warning')
-    #return redirect(url_for('fetch_all_recipes'))
+
+    keyToUse = str(uuid.uuid4())
+    return render_template('new-license.html', firstName=current_user.first_name, lastName=current_user.last_name, newKey=keyToUse)
 
 @app.route('/licenses/add-license', methods=['POST'])
 @login_required
-@roles_required('admin', 'contributor')
+@roles_required('admin')
 def add_license():
     if request.method == 'POST':
         form = request.form
@@ -336,13 +373,40 @@ def add_license():
         flash('Saved New License: {}'.format(form['licenseKey']), 'success')
         return redirect(url_for('license_manager'))
     else:
-        return render_template('new-license.html', firstName=current_user.first_name, lastName=current_user.last_name, all_categories=categories.find())
+        return render_template('new-license.html', firstName=current_user.first_name, lastName=current_user.last_name)
 
+##deactivates the license key from the current computer, so a user can switch devices
+@app.route('/licenses/deactivate-key', methods=['GET', 'POST'])
+@login_required
+@roles_required('admin', 'user')
+def deactivate_license():
+    if request.method == 'POST':
+        form = request.form
+        if form['active'] == 'false':
+            try:
+                update_license = licenses.find_one({'licenseKey': current_user.licenseKey})
+                update_license['machine']['active'] = False
+                update_license['machine']['machineId'] = None
+                update_license['machine']['networkId'] = None
 
-# DELETE RECIPE
+                licenses.update({'_id': ObjectId(update_license['_id'])},
+                    update_license)
+
+            except Exception as e:
+                print(e)
+                flash('Unknown Error Deactivating License', 'warning')
+                return redirect(url_for('my_license'))
+            flash('Deactivated License', 'success')
+            return redirect(url_for('my_license'))
+        else:
+            flash('License already activated', 'warning')
+            return redirect(url_for('my_license'))
+    return redirect(url_for('my_license'))
+
+# DELETEs License key
 @app.route('/licenses/delete-license/<license_id>', methods=['GET', 'POST'])
 @login_required
-@roles_required('admin', 'contributor')
+@roles_required('admin')
 def delete_license(license_id):
     delete_license = licenses.find_one({'_id': ObjectId(license_id)})
     if delete_license:
@@ -352,10 +416,10 @@ def delete_license(license_id):
     flash('License not found.', 'warning')
     return redirect(url_for('license_manager'))
 
-# LOAD EDIT TEMPLATE
+# LOAD LICENSE EDIT TEMPLATE
 @app.route('/licenses/edit-license/<license_id>', methods=['GET', 'POST'])
 @login_required
-@roles_required('admin', 'contributor')
+@roles_required('admin')
 def edit_license(license_id):
     edit_licenes = licenses.find_one({'_id': ObjectId(license_id)})
     if edit_licenes:
@@ -363,10 +427,10 @@ def edit_license(license_id):
     flash('License not found.', 'warning')
     return redirect(url_for('license_manager'))
 
-# UPDATE RECIPE
+# UPDATE License info
 @app.route('/licenses/update-license/<license_id>', methods=['GET', 'POST'])
 @login_required
-@roles_required('admin', 'contributor')
+@roles_required('admin')
 def update_license(license_id):
     if request.method == 'POST':
         form = request.form
@@ -392,29 +456,29 @@ def update_license(license_id):
             return redirect(url_for('license_manager'))
         flash('Updated License', 'success')
         return redirect(url_for('license_manager'))
-    return render_template('recipes.html', all_roles=roles.find(), all_users=recipes.find())
+    return render_template('licenses.html', all_roles=roles.find(), all_users=licenses.find())
 
-
+# search license not fully implemented
 @app.route('/licenses/search', methods=['POST'])
 @login_required
-@roles_required('admin', 'contributor', 'user')
+@roles_required('admin', 'user')
 def serch_license():
     if request.method == 'POST':
         form = request.form
-        allRecipes = recipes.find()
+        allLicense = licenses.find()
         search_data = form['search_string']
         #search_terms = search_data.split(' ')
         if search_data == '':
             flash('Please enter search keywords', 'warning')
             return redirect(url_for('index'))
         results = list()
-        for recipe in allRecipes:
-            if search_data.lower() in recipe['recipe_name'].lower():
-                results.append(recipe)
+        for license in allLicense:
+            if search_data.lower() in license['licenseKey'].lower():
+                results.append(license)
         if len(results) == 0:
             flash('No Licenses matching search', 'warning')
             return redirect(url_for('index'))
-        return 'Search feature not yet implemented, found %s results'%(len(results))
+        return 'Search feature not yet complete, found %s results'%(len(results))
     else:
         return redirect(url_for('index'))
 

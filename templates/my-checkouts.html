@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %} License Administration {% endblock %}
+
+
+{% block body %} 
+
+<h1>Purchase History</h1>
+<hr>
+<div class="container">
+    <div class="row">
+        <h3 style="margin-right: 67%;">Total Checkouts: {{totalSuccess}}</h3>
+        <form action="{{ url_for('my_license') }}" method="GET">
+        <input type="submit" value="Back"  />
+    </form>  
+    </div>
+</div>
+  <br>
+  {% if totalSuccess > 0 %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col"></th>
+                <th scope="col">Item</th>
+                <th scope="col">Site</th>
+                <th scope="col">Date</th>
+                <th scope="col">Status</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for row in checkouts %}
+            <tr>
+                
+                <td> <img src="{{ row['imageUrl'] }}" width="40" height="40"></td>
+                <td> {{ row['name'] }}</td>
+                <td>{{ row['brand']}}</td>
+                <td> {{ row['timeOfPurchase'] }}</td>
+                <td> Purchased </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+
+{% endblock %}
